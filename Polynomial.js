@@ -164,7 +164,17 @@ class PolynomialF2{
         return html;
     }
 
-    toBitString(deg){
+    toBitString(deg,isHtml){
+        if(isHtml){
+            var html = '<div class="bitstring">';
+            for(var i = deg;i>=0;i--){
+                var bit = ((this.bits>>i)&1)
+                html+='<span class="bit'+bit+'">'+bit+'</span>';
+            }
+            return html+"</div>";
+        }
+        if(deg === undefined)
+            deg = this.degree;
         var bits = this.bits.toString(2);
         while(bits.length<=deg){
             bits = "0"+bits;

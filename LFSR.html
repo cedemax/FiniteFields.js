@@ -1,0 +1,298 @@
+<html>
+<head>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+
+    <script
+    src="https://code.jquery.com/jquery-3.3.1.min.js"
+    integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+    crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/5.0.4/math.js"></script>
+    <script src="Polynomial.js"></script>
+    <script src="FiniteFields.js"></script>
+    
+    <style>
+        h4{
+            font-size: 18px;
+        }
+        .poly{
+            padding: 2px 4px 2px 4px;
+            border-radius: 5px;
+            border:1px solid rgba(0,0,255,0.25);
+            background-color:rgba(0,0,255,0.05);
+            line-height: 17px;
+            height: 20px;
+            margin:1px;
+            font-size: 15px;
+            display: inline-block;
+        }
+        .poly:hover{
+            background-color:rgba(0,0,255,0.15);
+        }
+        .taps{
+
+        }
+        .tap{
+            width:30px;
+            height: 30px;
+            border:1px solid #666;
+            border-radius: 5px;
+        }
+        .tap.active{
+            background-color:rgb(37, 149, 255);
+        }
+        .tap:hover{
+            background-color:rgb(157, 199, 192);
+        }
+        .tap.active:hover{
+            background-color:rgb(167, 229, 255);
+        }
+        .tap.zoom{
+            border:1px solid rgb(255,150,0);
+            box-shadow: 0 0 3px 2px rgb(255,150,0);
+        }
+        .letter{
+            height: 20px;
+            font-weight: bold;
+            width: 30px;
+            text-align: center;
+        }
+        .bitstring{
+            height:20px;
+            display: flex;
+        }
+        .bitstring .bit0,.bitstring .bit1{
+            width:17px;
+            height:17px;
+            display: block;
+            flex: 0 0 auto;
+            text-align: center;
+            font-size: 8px;
+            line-height: 15px;
+
+        }
+        .bitstring .bit0{
+            background: #000;
+            border: 1px solid #333;
+            color:#666;
+        }
+        .bitstring .bit1{
+            border: 1px solid #ddd;
+        }
+    </style>
+    <script>
+        var field;
+
+        function createTaps(id,state){
+            var html = '<table class="taps" id="'+id+'"><tr>';
+            for(var i = 0;i<bits;i++){
+                var c = "tap";
+                if(state&(1<<i))
+                    c += " active";
+                html+='<td><div class="'+c+'" data-n="'+i+'"></div>';
+            }
+            html+="</tr></table>";
+            $('#'+id+"div").html(html);
+        }
+        function setTap(id,state){
+            for(var i = 0;i<bits;i++){
+                if(state&(1<<i))
+                    $('#'+id+' .tap[data-n='+i+']').removeClass('active').addClass('active');
+                else
+                    $('#'+id+' .tap[data-n='+i+']').removeClass('active');
+
+            }
+        }
+        function parseTap(id){
+            var state = 0;
+            for(var i = 0;i<bits;i++){
+                var set = $('#'+id+' .tap[data-n='+i+']').hasClass('active');
+                if(set)
+                    state ^= (1<<i);
+            }
+            return state;
+        }
+        function restart(){
+            plainText = Array.from($('#plain').val());
+            plainBits = plainText.map(x => byteToBits(x.charCodeAt(0))).reduce((a,b) => a.concat(b));
+            if(loop !== undefined)
+                clearTimeout(loop);
+            parseDegree();
+            parseTaps();
+            $('#cipher').html();
+            encrypt();
+            shift();
+        }
+        function parseDegree(){
+            bits = parseInt($('#degree').val());
+            createTaps("initial",initial);
+            createTaps("taps",taps);
+            createTaps("state",initial);
+            $('#state td:last-of-type .tap').addClass('zoom')
+
+        }
+        function parseTaps(){
+            var oldInitial = initial;
+            initial = parseTap('initial');
+            if(initial != oldInitial){
+                return restart();
+            }
+            taps = parseTap('taps');
+            var poly = new PolynomialF2(taps);
+            poly.bits |= (1<<bits);
+            field = new FiniteField(poly);
+
+            $('#field').html(field.toString(true));
+            $('#prim').html(field.isPrimitive?"Yes":"No");
+            $('#period').html(field.period + " ("+(Math.ceil(100*field.period/((1<<field.degree)-1)))+"%)");
+
+        }
+       
+        var bits = 8;
+        var initial = 1;
+        var taps = 397;
+        var plainBits = [];
+        var cipherBits = [];
+        var plainText = [];
+        function encrypt(){
+            
+        }
+        function byteToBits(b){
+            var p = new Array(8).fill(0);
+            for(var i = 0;i<8;i++){
+                if(b>>i)
+                    p[7-i] = 1;
+            }
+            return p;
+        }
+        function bitsToByte(b){
+            var s = 0;
+            for(var i = 0;i<8;i++){
+                if(b[i])
+                    s ^= (1<<(7-i));
+            }
+            return s;
+        }
+        var loop;
+        function shift(){
+            var state = parseTap('state');
+            var poly = new PolynomialF2(state);
+            var next = field.mult(poly,PolynomialF2.single(1));
+            setTap("state",next.bits);
+            loop = setTimeout(shift,100);
+            var letter = "";
+            if((plainBits.length%8)==1 && plainBits.length > 0)
+                letter= plainText[Math.floor(plainBits.length/8)];
+            var html = '<div class="letter">'+letter+"</div>";
+            $('#letters').prepend(html);
+            var m = plainBits.pop();
+            var k = state>>(bits-1);
+            var c = m^k;
+            var b = c+(k<<1)+(m<<2);
+            cipherBits.push(c);
+
+            var letter = "";
+            if((cipherBits.length%8)==0)
+                letter= String.fromCharCode(bitsToByte(cipherBits.slice(cipherBits.length-8,cipherBits.length-1)));
+            html = '<div class="letter">'+letter+"</div>";
+            $('#ciphers').prepend(html);
+            $('#cipher').prepend(new PolynomialF2(b).toBitString(2,true));
+        }
+
+        $(document).ready(function(){
+            restart();
+        })
+        $(document).on('keyup','#plain',function(){
+            restart();
+        })
+        $(document).on('change','#degree',function(){
+            restart();
+        })
+        $(document).on('click','.tap',function(){
+            $(this).toggleClass('active');
+            parseTaps();
+        })
+    </script>
+</head>
+
+<body>
+    <div>
+        <div class="container">
+            <h2>Stream cipher</h2>
+            Starting from one polynomial (ex 1) as the state, and repeatedly multiplying the state by "a" over a finite field yields a LFSR like stream cipher.
+            <br>
+            <div class="row">
+                <table class="table table-sm">
+                    <tr>
+                        <th>Degree</th>
+                        <th>Field</th>
+                        <th>Primitive</th>
+                        <th>Period</th>
+                    </tr>
+                    <tr>
+                        <td>
+                            <input type="number" value="8" id="degree" class="form-control"/>
+                        </td>
+                        <th><span id="field"></span></th>
+                        <td><span id="prim"></span></td>
+                        <td><span id="period"></span></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="row">
+                <div class="col-sm">
+                    <h4>Plain Text</h4>
+                    <input id="plain" type="text" value="Max is a hacker" class="form-control">
+                   
+                </div>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-sm">
+                    <h4>Initial State</h4>
+                    <div id="initialdiv">
+                        
+                    </div>
+                    <h4>Taps</h4>
+                    <div id="tapsdiv">
+                        
+                    </div>
+                    <h4>State</h4>
+                    <div id="statediv">
+                        
+                    </div>
+                    <hr>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm">
+                    <h4>Output</h4>
+                    <table>
+                        <tr><th></th><th>M K C</th></tr>
+                        <tr>
+                            <td>
+                                <div id="letters">
+
+                                </div>
+                            </td>
+                            <td>
+                                <div id="cipher">
+
+                                </div>
+                            </td>
+                            <td>
+                                <div id="ciphers">
+
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                    <hr>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

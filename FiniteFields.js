@@ -223,8 +223,8 @@ class FiniteField{
         return html;
     }
 
-    toBitString(polynomial){
-        return polynomial.toBitString(this.degree-1);
+    toBitString(polynomial,isHtml){
+        return polynomial.toBitString(this.degree-1,isHtml);
     }
 
 }

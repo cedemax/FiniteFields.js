@@ -33,6 +33,28 @@
         .poly:hover{
             background-color:rgba(0,0,255,0.15);
         }
+        .bitstring{
+            height:20px;
+            display: flex;
+        }
+        .bitstring .bit0,.bitstring .bit1{
+            width:17px;
+            height:17px;
+            display: block;
+            flex: 0 0 auto;
+            text-align: center;
+            font-size: 8px;
+            line-height: 15px;
+
+        }
+        .bitstring .bit0{
+            background: #000;
+            border: 1px solid #333;
+            color:#666;
+        }
+        .bitstring .bit1{
+            border: 1px solid #ddd;
+        }
         #menu{
             position: absolute;
             border:1px solid #000;
@@ -65,7 +87,7 @@
             html+="<tr><td>Degree</td><td>"+poly.degree+"</td></tr>";
             html+="<tr><td>Irreducible</td><td>"+(field.irreducible[poly]?"Yes":"No")+"</td></tr>";
             html+="<tr><td>Factored</td><td>"+toFactoredString(poly)+"</td></tr>";
-            html+="<tr><td>Bits</td><td>"+field.toBitString(poly)+"</td></tr>";
+            html+="<tr><td>Bits</td><td>"+field.toBitString(poly,true)+"</td></tr>";
             html+="</table>";
             return html;
         }
@@ -102,7 +124,7 @@
                 html+="<td>"+new PolynomialF2(undefined,i).toString(true)+"</td>";
                 html+='<td>'+pows[i].toString(true)+"</td>";
                 html+="<td>"+toFactoredString(pows[i])+"</td>";
-                html+='<td>'+field.toBitString(pows[i])+"</td>";
+                html+='<td>'+field.toBitString(pows[i],true)+"</td>";
                 html+="</tr>";
             }
             html+="</table>";
@@ -168,7 +190,7 @@
 <body>
     <div>
         <div class="container">
-            <h2>Finite Fields Solver</h2>
+            <h2>Finite Fields</h2>
             <br>
             <div class="row">
                 <table class="table table-sm">
