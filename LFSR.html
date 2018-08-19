@@ -9,7 +9,6 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/5.0.4/math.js"></script>
-    <script src="Polynomial.js"></script>
     <script src="FiniteFields.js"></script>
     
     <style>
@@ -139,9 +138,8 @@
                 return restart();
             }
             taps = parseTap('taps');
-            var poly = new PolynomialF2(taps);
-            poly.bits |= (1<<bits);
-            field = new FiniteField(poly);
+            taps |= (1<<bits);
+            field = new FiniteField(taps);
 
             $('#field').html(field.toString(true));
             $('#prim').html(field.isPrimitive?"Yes":"No");
@@ -177,9 +175,8 @@
         var loop;
         function shift(){
             var state = parseTap('state');
-            var poly = new PolynomialF2(state);
-            var next = field.mult(poly,PolynomialF2.single(1));
-            setTap("state",next.bits);
+            var next = field.mult(state,2);
+            setTap("state",next);
             loop = setTimeout(shift,100);
             var letter = "";
             if((plainBits.length%8)==1 && plainBits.length > 0)
@@ -197,7 +194,7 @@
                 letter= String.fromCharCode(bitsToByte(cipherBits.slice(cipherBits.length-8,cipherBits.length-1)));
             html = '<div class="letter">'+letter+"</div>";
             $('#ciphers').prepend(html);
-            $('#cipher').prepend(new PolynomialF2(b).toBitString(2,true));
+            $('#cipher').prepend(field.polyToBitString(b,2,true));
         }
 
         $(document).ready(function(){
