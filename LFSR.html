@@ -149,9 +149,9 @@
 
         }
        
-        var bits = 8;
-        var initial = 1;
-        var taps = 397;
+        var bits = 17;
+        var initial = 11242;
+        var taps = 9;
         var plainBits = [];
         var cipherBits = [];
         var plainText = [];
@@ -219,8 +219,8 @@
 <body>
     <div>
         <div class="container">
-            <h2>Stream cipher</h2>
-            Starting from one polynomial (ex 1) as the state, and repeatedly multiplying the state by "a" over a finite field yields a LFSR like stream cipher.
+            <h2>Galois-LFSR Stream cipher</h2>
+            Starting from one polynomial (ex 1) as the state, and repeatedly multiplying the state by "a" over a finite field yields a Galois-LFSR.
             <br>
             <div class="row">
                 <table class="table table-sm">
@@ -232,7 +232,7 @@
                     </tr>
                     <tr>
                         <td>
-                            <input type="number" value="8" id="degree" class="form-control"/>
+                            <input type="number" value="17" id="degree" class="form-control"/>
                         </td>
                         <th><span id="field"></span></th>
                         <td><span id="prim"></span></td>

@@ -68,12 +68,12 @@
     <script>
         var field;
 
-      
+        var powerTable = 0;
         function generatePowerTable(mode){
             if(mode === undefined){
                 mode = $("#generate .active input").attr('data-mode');
             }
-            $('#powers').html(createPowerTable(field,mode));
+            $('#powers').html(createPowerTable(field,mode,powerTable,powerTable+=100));
 
         }
 
@@ -95,37 +95,47 @@
         }
         function toFactoredString(poly){
             var html = "";
-            var factors = poly.factor();
+            var factors = field.factor(poly);
             for(var j= 0;j<factors.length;j++){
                 html+=factors[j].toString(true);
             }  
             return html;
         }
-        function createPowerTable(field,mode){
+        function createPowerTable(field,mode,start,end){
             var pows = [];
+            var inds = [];
             var exps = field.allPowers;
-            console.log(mode);
+            start = 0
+            end = exps.length;
+            console.log(mode+" "+start+" - "+end);
             if(mode == "All"){
-                pows = exps;
+                for(var i = start;i<end;i++){
+                    pows.push(exps[i]);
+                    inds.push(i);
+                }
             }else if(mode == "Irreducible"){
-                for(var i = 0;i<exps.length;i++){
-                    if(field.irreducible[i]){
+                for(var i = start;i<end;i++){
+                    if(field.irreducible[exps[i].bits]){
                         pows.push(exps[i]);
+                        inds.push(i);
                     }
                 }
             }else if(mode == "Reducible"){
-                for(var i = 0;i<exps.length;i++){
-                    if(!field.irreducible[i]){
+                for(var i = start;i<end;i++){
+                    if(!field.irreducible[exps[i].bits]){
                         pows.push(exps[i]);
+                        inds.push(i);
                     }
                 }
             }
-            var html = '<table class="table table-sm"><tr><td>Exponential</td><td>Polynomial</td><td>Factored</td><td>Bits</td></tr>';
+            var html = "<h4>"+mode+" Elements - "+pows.length+ " ("+Math.round(100*pows.length/exps.length)+"%)</h4>";
+            html += '<table class="table table-sm"><tr><td>Exponential</td><td>Polynomial</td><td>Factored</td><td>Bits</td></tr>';
             for(var i = 0;i<pows.length;i++){
+                var poly = pows[i].toString(true);
                 html+="<tr>";
-                html+="<td>"+new PolynomialF2(undefined,i).toString(true)+"</td>";
-                html+='<td>'+pows[i].toString(true)+"</td>";
-                html+="<td>"+toFactoredString(pows[i])+"</td>";
+                html+="<td>"+new PolynomialF2(undefined,inds[i]).toString(true)+"</td>";
+                html+='<td>'+poly+"</td>";
+                html+="<td>"+(field.irreducible[pows[i].bits]?poly:toFactoredString(pows[i]))+"</td>";
                 html+='<td>'+field.toBitString(pows[i],true)+"</td>";
                 html+="</tr>";
             }
@@ -137,6 +147,7 @@
             
         }
         function parseField(){
+            var time = Date.now();
             $('#field').html(field.toString(true));
             if(field.degree < 8){
                 generatePowerTable();
@@ -152,7 +163,8 @@
             doMath();
         }
         $(document).ready(function(){
-            field = FiniteField.parseField("a^8+a^4+a^3+a^2+1");
+            field = FiniteField.parseField("a^20+a^3+1");
+            //field = FiniteField.parseField("a^15+a^11+1");
             $('#polyF').val(field.field.toString(false));
             $('#menu').mouseleave();
             parseField();
@@ -193,6 +205,7 @@
     <div>
         <div class="container">
             <h2>Finite Fields</h2>
+            Don't try fields of degree > 22 
             <br>
             <div class="row">
                 <table class="table table-sm">
