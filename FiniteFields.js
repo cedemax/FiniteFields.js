@@ -1,12 +1,12 @@
 class FiniteField{
     constructor(polynomial){
         var time = Date.now();
-        this.counters = [0,0,0,0,0,0,0,0,0,0];
         this.field = polynomial;
-        this.reduction = PolynomialF2.add(polynomial,PolynomialF2.single(polynomial.degree));
-        this.degree = polynomial.degree;
+        this.degree = FiniteField.intLog2(polynomial);
+        this.size = 1<<this.degree;
+        this.reduction = polynomial^this.size;
         this.p2s = this.powersOf2();
-        this.allPolys = this.makeAllPolys();
+        this.degrees = this.logarithmsOf2();
         this.allPowers = this.makePowers();
         console.log(Date.now()-time);
         var d = {};
@@ -22,20 +22,20 @@ class FiniteField{
      // O(n)
     powersOf2(){
         var N = [];
-        for(var n = 0;n<=this.degree;n++){
+        for(var n = 0;n<=32;n++){
             N.push(1<<n);
         }
         return N;
     }
     // precompute
      // O(2^n)
-    makeAllPolys(){
-        var ret = [PolynomialF2.empty()];
+    logarithmsOf2(){
+        var ret = [0];
         for(var n = 0;n<this.degree;n++){
             var start = 1<<n;
             var end = 1<<(n+1);
             for(var i = start;i<end;i++){
-                ret.push(new PolynomialF2(i,n));
+                ret.push(n);
             }
         }
         return ret;
@@ -43,16 +43,15 @@ class FiniteField{
     // precompute
      // O(2^n^2)
     getIrreducibles(){
-        var isIrr = new Array(this.allPolys.length).fill(1);
-        for(var i = 4;i<this.allPolys.length;i++){  
+        var isIrr = new Array(this.size).fill(1);
+        for(var i = 4;i<this.size;i++){  
             isIrr[i] = i&1;                                 // divisible by x 
         }
-        for(var i = 3;i<this.allPolys.length;i+=2){
-            var lastJ = (1<<(this.degree-this.allPolys[i].degree));
-            var di = this.allPolys[i].degree;
+        for(var i = 3;i<this.size;i+=2){
+            var lastJ = this.p2s[this.degree-this.degrees[i]];
+            var di = this.degrees[i];
             for(var j = 3;j<lastJ;j+=2){             
-                var m = this._mult(i,j,di,this.allPolys[j].degree);
-                isIrr[m] = 0;
+                isIrr[this._mult(i,j,di,this.degrees[j])]=0;
             }
         }
         return isIrr;
@@ -61,16 +60,16 @@ class FiniteField{
     // O(2^n)
     makePowers(){
         if(this.degree < 2){
-            return [this.allPolys[1]];
+            return [1];
         }
         var bits = 1;
-        var maximal = (1<<this.degree);
+        var maximal = this.size;
         var ret = new Array(maximal);
         ret[0] = 1;
         for(var n = 1;n<maximal;n++){
             bits = bits<<1;
             if(bits >= maximal){
-                bits ^= this.field.bits;
+                bits ^= this.field;
             }
             ret[n] = bits;
         }
@@ -82,29 +81,31 @@ class FiniteField{
             }
 
         }
-        var polys = ret.map(x => this.allPolys[x]);
-        return polys;
+        return ret;
     }
     // helper
-    mod(a,n){
+    static mod(a,n){
         var a = a%n;
         if(a<0)
             return a+n;
         return a;
+    }
+    static intLog2(a){
+        return Math.max(0,Math.floor(Math.log2(a)));
     }
     
     get period(){
         return this.allPowers.length;
     }
     get isPrimitive(){
-        return this.isIrreducible && this.period == ((1<<this.degree)-1);
+        return this.isIrreducible && this.period == (this.size-1);
     }
     get isIrreducible(){
         return this.factor(this.field).length == 1;
     }
 
     toPolynomial(power){
-        var p = this.mod(power,this.period);
+        var p = FiniteField.mod(power,this.period);
         return this.allPowers[p];
     }
     toExponential(polynomial){
@@ -112,18 +113,18 @@ class FiniteField{
     }
 
     add(A,B){
-        return this.reduce(PolynomialF2.add(A,B));
+        return this.reduce(A^B);
     }
     sub(A,B){
         return this.add(A,B);
     }
    
     mult(A,B){
-        if(A.bits==0 || B.bits==0)  // one of them is zero
-            return this.allPolys[0];
-        if(A.bits == 1)
+        if(A==0 || B==0)  // one of them is zero
+            return 0;
+        if(A == 1)
             return this.reduce(B);
-        if(B.bits == 1)
+        if(B == 1)
             return this.reduce(A);
         var power = this.toExponential(A)+this.toExponential(B);
         if(!isNaN(power))
@@ -132,26 +133,27 @@ class FiniteField{
         var newBits = 0;
         var a = this.reduce(A);
         var b = this.reduce(B);
-        for(var i = 0;i<=a.degree;i++){
-            if(a.bits&this.p2s[i]){
-                for(var j = 0;j<=b.degree;j++){
-                    if(b.bits&this.p2s[j]){
+        for(var i = 0;i<=this.degrees[a];i++){
+            if(a&this.p2s[i]){
+                for(var j = 0;j<=this.degrees[b];j++){
+                    if(b&this.p2s[j]){
                         newBits^=this.p2s[i+j]; 
                     }
                 }
             }
         }
-        return this.reduce(new PolynomialF2(newBits));
+        return this.reduce(newBits);
     }
     _mult(a,b,da,db){
         var p = this.polyToPower[a]+this.polyToPower[b];
         if(!isNaN(p))
-            return this.allPowers[p%this.period].bits;
+            return this.allPowers[p%this.period];
+        // field is not primitive, some polys cannot be expressed as powers
         var newBits = 0;
         for(var i = 0;i<=da;i++){
-            if(a.bits&this.p2s[i]){
+            if(a&this.p2s[i]){
                 for(var j = 0;j<=db;j++){
-                    if(b.bits&this.p2s[j]){
+                    if(b&this.p2s[j]){
                         newBits^=this.p2s[i+j]; 
                     }
                 }
@@ -160,12 +162,12 @@ class FiniteField{
         return newBits;
     }
     pow(A,n){
-        if(A.bits == 0)
-            return this.allPolys[0];
-        if(A.bits == 1)
-            return this.allPolys[1];
+        if(A == 0)
+            return 0;
+        if(A == 1)
+            return 1;
         if(n == 0)
-            return this.allPolys[1];
+            return 1;
         if(n == 1)
             return this.reduce(A);
     
@@ -184,39 +186,31 @@ class FiniteField{
             }
             return ret;
         }else{
-            return this.pow(this.div(this.allPolys[1],A),-n);
+            return this.pow(this.div(1,A),-n);
         }
     }
     div(A,B){
-        if(B.bits==0)  // div zero
-            return this.allPolys[1/0];
-        if(A.bits == 0)
-            return this.allPolys[0];
-        if(B.bits == 1)
+        if(B==0)  // div zero
+            throw "Division by zero";
+        if(A == 0)
+            return 0;
+        if(B == 1)
             return this.reduce(A);
         var power = this.toExponential(A)-this.toExponential(B);
         if(!isNaN(power))
             return this.toPolynomial(power);
         // field is not primitive, A or B not expressible as a power
         // naive, iterate through all polys to find the correct one
-        for(var i = 0;i<this.allPolys.length;i++){
-            if(this.mult(B,this.allPolys[i]).bits == A.bits)
-                return this.allPolys[i];
+        for(var i = 0;i<this.degrees.length;i++){
+            if(this.mult(B,i) == A)
+                return i;
         }
         // wut?
-        return this.allPolys[1/0];
+        throw "WUT? division";
     }
 
     factor(A){
-        var f = this._factor(A.bits,A.degree);
-        var polys = new Array(f.length);
-        for(var i = 0;i<f.length;i++){
-            if(f[i]<this.field.bits)
-                polys[i] = this.allPolys[f[i]];
-            else    
-                polys[i] = new PolynomialF2(f[i]);
-        }
-        return polys;
+        return this._factor(A,this.degrees[A]);
     }
     _factor(a,d){
         if(a<4 || this.irreducible[a])  // a+1,a,1,0 or irreducible
@@ -226,11 +220,11 @@ class FiniteField{
 
         var maxDeg = Math.ceil(d/2);
         for(var n1 = 1;n1<=maxDeg;n1++){    // go through all degrees necessary
-            var start1 = 1<<n1; //                  ex a
-            var end1 = 2<<n1;   //                  ex a2
+            var start1 = this.p2s[n1]; //                  ex a
+            var end1 = this.p2s[n+1];   //                  ex a2
             var n2 = this.degree-n1;    // this
-            var start2 = 1<<(n2);  //   ex a7     
-            var end2 = 2<<(n2);    //   ex a8   -> a*a7 = a8
+            var start2 = this.p2s[n2];  //   ex a7     
+            var end2 = this.p2s[n2+1];    //   ex a8   -> a*a7 = a8
             for(var i = start1;i<end1;i++){   // all polys of that degree 1
                 for(var j = start2;j<end2;j++){   // all polys of that degree 2, so that degree 1+2 = this.degree
                     if(this._mult(i,j,n1,n2)==a){
@@ -242,32 +236,29 @@ class FiniteField{
         // irreducible
         return [a];
     }
-    
-
     reduce(A){
-        if(A.bits === undefined)    // defined as a^n
-            return this.toPolynomial(A.degree);
-        if(A.bits < this.p2s[this.degree])    // avoid degree calculation
+        if(A < this.p2s[this.degree])    // avoid degree calculation
             return A;
-        var result = A.bits&((1<<this.degree)-1);    
-        for(var i = this.degree;i<A.degree;i++){
-            if(A.bits&this.p2s[i]){
-                result ^= this.toPolynomial(i).bits;
+        var result = A&(this.size-1);    
+        var da = Math.floor(Math.log2(A));
+        for(var i = this.degree;i<da;i++){
+            if(A&this.p2s[i]){
+                result ^= this.toPolynomial(i);
             }
         }
-        return this.allPolys[result];
+        return result;
     }
 
     // create a finite field from the expression.
     // should not contain multiplications or divisions
     static parseField(expression){
-        return new FiniteField(PolynomialF2.parseExpression(expression));
+        return new FiniteField(FiniteField.parsePolynomial(expression));
     }
 
     // uses math.js to parse the expression tree
     parseExpression(expression){
         if(expression == "0" || expression =="" || expression == null)
-            return this.allPolys[0];
+            return 0;
         var expr = expression.replace("^-","@");
         if(expr[0] == "-")  // drop first -
             expr = expr.substring(1,expr.length-1);
@@ -280,9 +271,9 @@ class FiniteField{
     }
     _solveExpr(node){
         if(node.type == "SymbolNode")
-            return this.allPolys[2];
+            return 2;
         if(node.type == "ConstantNode"){
-            return this.allPolys[node.value%2];
+            return node.value%2;
         }
         if(node.type == "OperatorNode"){
             switch(node.op){
@@ -305,21 +296,125 @@ class FiniteField{
         }       
     }
 
+    static parsePolynomial(expression){
+        if(expression == "0" || expression =="" || expression == null)
+            return 0;
+        var expr = expression
+        if(expr.substr(0,1) == "-")  // drop first -
+            expr = expr.substring(1,expr.length-1);
+        expr = expr.replace("(-","(");  // drop parenthesis first -
+        expr = expr.replace("-","+");   // change all - to +
+        console.log(expr);
+        var expr0 = math.parse(expr);
+        console.log(expr0);
+        
+        return FiniteField._solvePolynomial(expr0);
+    }
+    static _solvePolynomial(node){
+        if(node.type == "SymbolNode")
+            return 2;
+        if(node.type == "ConstantNode"){
+            return node.value%2;
+        }
+        if(node.type == "OperatorNode"){
+            switch(node.op){
+                case "^":
+                    if(node.args[1].type == "ConstantNode")
+                        return (1<<node.args[1].value);
+                    return FiniteField.empty();
+                case "+":
+                    return FiniteField._solvePolynomial(node.args[0])^FiniteField._solvePolynomial(node.args[1]);
+            }
+        }     
+        if(node.type == "ParenthesisNode"){
+            return FiniteField._solvePolynomial(node.content);
+        }       
+    }
+
     toString(isHtml){
         var html = "";
         if(isHtml){
-            html+= '<span class="field" data-num="'+this.field.bits+'">';
+            html+= '<span class="field" data-num="'+this.field+'">';
             html+="&Gopf;&Fopf;(2<sup>"+this.degree+"</sup>)";
-            html+=this.field.toString(isHtml);
+            html+=this.polyToString(this.field,isHtml);
             html+="</span>";
         }else{
-            html+="GF(2^"+this.degree+") "+this.fill.toString(isHtml);
+            html+="GF(2^"+this.degree+") "+this.polyToString(this.field,isHtml);
         }
         return html;
     }
 
+    polyToString(poly,isHtml,isDeg){
+        var deg = FiniteField.intLog2(poly);
+        if(isDeg){
+            deg = poly;
+            poly = null;
+        }
+        if(isHtml){
+            var html = '<span class="poly" data-num="'+poly+'">';
+            if(poly == null){
+                html+="a<sup>"+deg+"</sup>";
+            }else{
+                for(var n = deg;n>=0;n--){
+                    if(poly & this.p2s[n]){
+                        if(n>0){
+                            html+= "a"
+                            if(n>1){
+                                html+="<sup>"+n+"</sup>";
+                            }
+                        }else{
+                            html+= "1";
+                        }
+                        html+="+";
+                    }
+                }
+            }
+            html = html.substr(0,html.length-1);
+            html+="</span>";
+        }else{
+            var html = "";
+            if(poly == null){
+                html+="a^"+deg;
+            }else{
+                for(var n = deg;n>=0;n--){
+                    if(poly & this.p2s[n]){
+                        if(n>0){
+                            html+= "a"
+                            if(n>1){
+                                html+="^"+n;
+                            }
+                        }else{
+                            html+= "1";
+                        }
+                        html+="+";
+                    }
+                }
+            }
+            html = html.substr(0,html.length-1);
+        }
+        return html;
+    }
+
+    polyToBitString(poly,deg,isHtml){
+        if(isHtml){
+            var html = '<div class="bitstring">';
+            for(var i = deg;i>=0;i--){
+                var bit = ((poly>>i)&1)
+                html+='<span class="bit'+bit+'">'+bit+'</span>';
+            }
+            return html+"</div>";
+        }
+        if(deg == null)
+            deg = FiniteField.intLog2(poly);
+        var bits = poly.toString(2);
+        while(bits.length<=deg){
+            bits = "0"+bits;
+        }
+        return bits;
+    }
+
     toBitString(polynomial,isHtml){
-        return polynomial.toBitString(this.degree-1,isHtml);
+        return this.polyToBitString(polynomial,this.degree-1,isHtml);
     }
 
 }
